@@ -32,10 +32,6 @@ st.markdown("""
         box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         margin: 10px 0;
     }
-    .highlight {
-        color: #4fc3f7;
-        font-weight: bold;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -47,18 +43,21 @@ df = load_data()
 st.markdown('<div class="card">', unsafe_allow_html=True)
 st.subheader("📊 Model Training")
 
-# Prepare data for ML
-# Select features for ML
-features = ['iyear', 'country_txt', 'region_txt']
-target = 'attacktype1_txt'
+# ===== IMPROVED: More features =====
+features = ['iyear', 'country_txt', 'region_txt', 'attacktype1_txt']
+target = 'weaptype1_txt'  # Predict weapon type instead of attack type
 
-# Create feature matrix
+# ===== IMPROVED: Create feature matrix =====
 X = df[features].copy()
 y = df[target].copy()
 
-# Encode categorical variables
+# ===== IMPROVED: Better handling of missing values =====
+# Fill missing target values with most common
+y = y.fillna(y.mode()[0])
+
+# ===== IMPROVED: Encode categorical variables =====
 label_encoders = {}
-for col in ['country_txt', 'region_txt']:
+for col in ['country_txt', 'region_txt', 'attacktype1_txt']:
     le = LabelEncoder()
     X[col] = le.fit_transform(X[col].astype(str))
     label_encoders[col] = le
@@ -67,15 +66,21 @@ for col in ['country_txt', 'region_txt']:
 target_encoder = LabelEncoder()
 y_encoded = target_encoder.fit_transform(y)
 
-# Check if we have enough data
+# ===== IMPROVED: Check if we have enough data =====
 if len(X) > 10:
     # Train-test split
     X_train, X_test, y_train, y_test = train_test_split(
         X, y_encoded, test_size=0.3, random_state=42, stratify=y_encoded
     )
     
-    # Train Random Forest
-    rf = RandomForestClassifier(n_estimators=50, random_state=42, max_depth=10)
+    # ===== IMPROVED: Better model with more trees =====
+    rf = RandomForestClassifier(
+        n_estimators=100,      # More trees (was 50)
+        max_depth=15,          # Deeper trees (was 10)
+        min_samples_split=5,
+        random_state=42,
+        n_jobs=-1              # Use all CPU cores
+    )
     rf.fit(X_train, y_train)
     
     # Predict
@@ -83,19 +88,20 @@ if len(X) > 10:
     accuracy = accuracy_score(y_test, y_pred)
     
     # Display results
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("🎯 Model Accuracy", f"{accuracy:.2%}")
     with col2:
         st.metric("📊 Training Samples", f"{len(X_train):,}")
+    with col3:
+        st.metric("🔧 Features Used", len(features))
     
     st.markdown("---")
     
-    # Feature Importance with USER-FRIENDLY NAMES
+    # ===== IMPROVED: Feature Importance =====
     st.subheader("🔑 Feature Importance")
     
-    # BETTER NAMES for display (iyear → Year, country_txt → Country, region_txt → Region)
-    feature_display_names = ['Year', 'Country', 'Region']
+    feature_display_names = ['Year', 'Country', 'Region', 'Attack Type']
     
     importance_df = pd.DataFrame({
         'Feature': feature_display_names,
@@ -107,20 +113,22 @@ if len(X) > 10:
         x='Importance',
         y='Feature',
         orientation='h',
-        title='What factors most influence attack type?',
+        title='What factors most influence weapon choice?',
         template='plotly_dark',
         color='Importance',
         color_continuous_scale='Blues'
     )
-    fig.update_layout(
-        height=350, 
-        paper_bgcolor='rgba(0,0,0,0)',
-        xaxis_title="Importance",
-        yaxis_title="Factor"
-    )
+    fig.update_layout(height=350, paper_bgcolor='rgba(0,0,0,0)')
     st.plotly_chart(fig, use_container_width=True)
     
-    st.info("💡 Random Forest model predicts attack type based on Year, Country, and Region")
+    # ===== NEW: Show top predictions =====
+    st.markdown("---")
+    st.subheader("🎯 Top Attack Patterns")
+    
+    # Get feature importance
+    top_features = importance_df.head(3)
+    st.info(f"💡 {top_features.iloc[0]['Feature']} is the strongest predictor, followed by {top_features.iloc[1]['Feature']}")
+    
 else:
     st.warning("⚠️ Not enough data to train model. Please check your dataset.")
     
