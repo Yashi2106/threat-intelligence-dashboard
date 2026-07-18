@@ -1,13 +1,18 @@
 import pandas as pd
 import numpy as np
 import streamlit as st
+import os
 
+@st.cache_data
 def load_data():
-    """Load and clean GTD dataset with optimized columns"""
+    """Load GTD dataset"""
     
     # Check if file exists
+    if not os.path.exists('data/gtd.csv'):
+        st.warning("⚠️ Dataset not found! Please upload data/gtd.csv")
+        return pd.DataFrame()
+    
     try:
-        # Load only needed columns to save memory
         columns_to_read = [
             'iyear', 'imonth', 'iday', 'country_txt', 'region_txt',
             'city', 'latitude', 'longitude', 'attacktype1_txt',
@@ -22,46 +27,27 @@ def load_data():
             usecols=lambda col: col in columns_to_read
         )
         
-        # Clean data
         df = df.dropna(subset=['country_txt', 'iyear'])
-        
-        # Fill missing values
         df['nkill'] = df['nkill'].fillna(0)
         df['nwound'] = df['nwound'].fillna(0)
         df['latitude'] = df['latitude'].fillna(0)
         df['longitude'] = df['longitude'].fillna(0)
-        
-        # Convert types
         df['iyear'] = df['iyear'].astype(int)
         df['nkill'] = df['nkill'].astype(int)
         df['nwound'] = df['nwound'].astype(int)
-        
-        # Add derived columns
         df['total_casualties'] = df['nkill'] + df['nwound']
         df['decade'] = (df['iyear'] // 10) * 10
-        
-        # Filter out years with no data
         df = df[df['iyear'] >= 1970]
         
         return df
         
-    except FileNotFoundError:
-        st.error("⚠️ Dataset not found! Please make sure 'data/gtd.csv' exists.")
-        return pd.DataFrame()
     except Exception as e:
         st.error(f"⚠️ Error loading data: {str(e)}")
         return pd.DataFrame()
 
 def get_summary_stats(df):
-    """Get summary statistics"""
     if df.empty:
-        return {
-            'total_attacks': 0,
-            'total_killed': 0,
-            'total_wounded': 0,
-            'countries': 0,
-            'years': 'N/A'
-        }
+        return {'total_attacks': 0, 'total_killed': 0, 'total_wounded': 0, 'countries': 0, 'years': 'N/A'}
     
     return {
         'total_attacks': len(df),
