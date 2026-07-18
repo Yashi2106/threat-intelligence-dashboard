@@ -7,7 +7,6 @@ import os
 def load_data():
     """Load GTD dataset"""
     
-    # Check if file exists
     if not os.path.exists('data/gtd.csv'):
         st.warning("⚠️ Dataset not found! Please upload data/gtd.csv")
         return pd.DataFrame()
